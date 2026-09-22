@@ -23,15 +23,17 @@ def get_file_size(url):
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://meeting.tencent.com/',
-            'Range': 'bytes=0-1'  # 只请求第一个字节来获取文件大小
+            'Referer': 'https://meeting.tencent.com/'
         }
-        response = requests.head(url, headers=headers, timeout=10)
-        
-        # 从响应中获取文件大小
-        if 'Content-Length' in response.headers:
-            return int(response.headers.get('Content-Length', 0))
-        return 0
+        with requests.head(url, headers=headers, timeout=10, allow_redirects=True) as response:
+            response.raise_for_status()
+            content_range = response.headers.get('Content-Range', '')
+            if content_range:
+                total = content_range.rsplit('/', 1)[-1]
+                return max(0, int(total)) if total.isdigit() else 0
+            if response.status_code == 206:
+                return 0  # 分段长度不能当成整个视频大小
+            return max(0, int(response.headers.get('Content-Length', 0)))
     except Exception as e:
         print(f"\033[0;31m无法获取文件大小: {str(e)}\033[0m", file=sys.stderr)
         return 0
